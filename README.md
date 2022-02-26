@@ -12,6 +12,8 @@ is connecting to.
         -s         Show network connection statistics
     reads from and appends to dns_entries.txt to map IP addresses to dns names
     
+Build using mr.bat, which invokes .net 6.0 to generate dns.exe
+
 Sample usage:
 
 C:\Users\david\OneDrive\dns>dns -i:104.98.114.24
