@@ -62,6 +62,78 @@ class DnsApp
         return null;
     } //likelyOwnerFromLookIP
 
+    static void PingServer( string remoteServer )
+    {
+        string server = null;
+        IPAddress serverip = null;
+
+        try
+        {
+            bool parseOK = IPAddress.TryParse( remoteServer, out serverip );
+            if ( parseOK )
+            {
+                // try to find the host name in the persistent cache or via a call, but it's not required
+
+                if ( !persistentEntries.TryGetValue( remoteServer, out server ) )
+                {
+                    try
+                    {
+                        Console.WriteLine( "finding dns name..." );
+                        System.Net.IPHostEntry entry = System.Net.Dns.GetHostEntry( serverip );
+                        server = entry.HostName;
+                    }
+                    catch( Exception )
+                    {
+                        server = "(unknown)";
+                    }
+                }
+
+                Console.WriteLine( "Pinging {0} [{1}]", server, serverip );
+            }
+            else
+            {
+                // Find the IP address of the hostname
+
+                server = remoteServer;
+                System.Net.IPHostEntry entry = System.Net.Dns.GetHostEntry( server );
+                serverip = entry.AddressList[ 0 ];
+                Console.Write( "Pinging {0} ", server );
+
+                for ( int a = 0; a < entry.AddressList.Length; a++ )
+                    Console.Write( "{0}" + "[" + entry.AddressList[ a ] + "]", ( a > 0 ) ? ", " : "" );
+    
+                Console.WriteLine();
+            }
+
+            for ( int p = 0; p < 4; p++ )
+            {
+                Ping ping = new Ping();
+                PingReply reply = ping.Send( serverip );
+
+                if ( IPStatus.Success == reply.Status )
+                    Console.WriteLine( "Reply from {0}: bytes={1} time={2}ms TTL={3}", reply.Address.ToString(), reply.Buffer.Length, reply.RoundtripTime, reply.Options.Ttl );
+                else
+                    Console.WriteLine( "Ping failed with status {0}", reply.Status.ToString() );
+            }
+        }
+        catch( System.Net.NetworkInformation.PingException e )
+        {
+            Exception baseex = e.GetBaseException();
+            if ( null != baseex )
+                Console.WriteLine( "ping exception: {0}", baseex.Message );
+            else
+                Console.WriteLine( "ping exception: {0}", e.Message );
+        }
+        catch( Exception e )
+        {
+            Exception baseex = e.GetBaseException();
+            if ( null != baseex )
+                Console.WriteLine( "exception: {0}", baseex.Message );
+            else
+                Console.WriteLine( "exception: {0}", e.Message );
+        }
+    } //PingServer
+
     static void ShowCurrentConnections()
     {
         IPGlobalProperties properties = IPGlobalProperties.GetIPGlobalProperties();
@@ -144,16 +216,20 @@ class DnsApp
 
     static void Usage()
     {
+        Console.WriteLine( "usage: dns [-a] [-i] [-l] [-s] [-x]" );
         Console.WriteLine( "enumerates currently open tcp connections" );
-        Console.WriteLine( "usage: dns [-l] [-i]" );
         Console.WriteLine( "arguments:" );
         Console.WriteLine( "    -a         Show active listeners on this machine" );
         Console.WriteLine( "    -i:IPV4    Find a host or company name for the address, e.g. /i:64.74.236.127" );
         Console.WriteLine( "    -l         Loop forever" );
-        Console.WriteLine( "    -l:X       Loop X times" );
+        Console.WriteLine( "    -l:X       Loop X times, e.g. /l:40" );
+        Console.WriteLine( "    -p:X       Ping the site or IP address, e.g. /p:cnn.com" );
         Console.WriteLine( "    -s         Show network connection statistics" );
         Console.WriteLine( "    -x         For unknown sites, use LookIP.net for resolution" );
-        Console.WriteLine( "reads from and appends to dns_entries.txt to map IP addresses to dns names" );
+        Console.WriteLine( "notes:" );
+        Console.WriteLine( "    reads from and appends to dns_entries.txt to map IP addresses to dns names" );
+        Console.WriteLine( "    -a, -i, -p, and -s are modes that run once and ignore -l looping" );
+        Console.WriteLine( "    The default mode with no arguments is to enumerate all connections" );
         Environment.Exit( 0 );
     } //Usage
 
@@ -227,18 +303,15 @@ class DnsApp
                             Console.WriteLine( "address {0}, hostname {1}", ip, hostName );
                             Environment.Exit( 0 );
                         }
-                        
-                        string [] elems = ip.Split( '.' );
-                        if ( 4 == elems.Length )
+
+                        IPAddress serverip;
+                        bool parseOK = IPAddress.TryParse( ip, out serverip );
+                        if ( parseOK )
                         {
-                            IPAddress address = new IPAddress( Convert.ToInt32( elems[ 0 ] ) << 24 |
-                                                               Convert.ToInt32( elems[ 1 ] ) << 16 | 
-                                                               Convert.ToInt32( elems[ 2 ] ) << 8  | 
-                                                               Convert.ToInt32( elems[ 3 ] ) );
                             try
                             {
-                                System.Net.IPHostEntry entry = System.Net.Dns.GetHostEntry( address );
-                                Console.WriteLine( "address {0}, hostname {1}", ip, entry.HostName );
+                                System.Net.IPHostEntry entry = System.Net.Dns.GetHostEntry( serverip );
+                                Console.WriteLine( "address {0}, hostname {1}", serverip, entry.HostName );
                             }
                             catch( Exception )
                             {
@@ -246,7 +319,6 @@ class DnsApp
                             }
 
                             Environment.Exit( 0 );
-
                         }
                         else
                         {
@@ -256,6 +328,17 @@ class DnsApp
                     }
                     else
                         Usage();
+                }
+                else if ( 'P' == c )
+                {
+                    if ( arg.Length < 6 || ':' != arg[ 2 ] )
+                    {
+                        Console.WriteLine( "ping argument is malformed" );
+                        Usage();
+                    }
+
+                    PingServer( arg.Substring( 3 ) );
+                    Environment.Exit( 0 );
                 }
                 else if ( 'S' == c )
                 {
