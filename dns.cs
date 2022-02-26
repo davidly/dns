@@ -1,5 +1,8 @@
 //
 // Shows network connection information
+// For the reverse DNS resolutions that .net 6 didn't find, I used (with example IPs):
+//    manual:                 https://otx.alienvault.com/indicator/ip/40.114.105.100
+//    automatical (use /x):   https://www.lookip.net/ip/38.133.127.31
 //
 
 using System;
@@ -23,9 +26,6 @@ class DnsApp
 
     static string likelyOwnerFromLookIP( string ip )
     {
-        // temporarily throttled, so skip
-        return null;
-
         var client = new HttpClient();
         string request = "https://www.lookip.net/ip/" + ip;
         HttpResponseMessage responseMessage = client.GetAsync( request ).Result;
@@ -53,6 +53,7 @@ class DnsApp
                     if ( 0 == owner.Length )
                         return null;
 
+                    //Console.WriteLine( "lookip resolution succeeded for {0}", owner );
                     return owner;
                 }
             }
@@ -151,6 +152,7 @@ class DnsApp
         Console.WriteLine( "    -l         Loop forever" );
         Console.WriteLine( "    -l:X       Loop X times" );
         Console.WriteLine( "    -s         Show network connection statistics" );
+        Console.WriteLine( "    -x         For unknown sites, use LookIP.net for resolution" );
         Console.WriteLine( "reads from and appends to dns_entries.txt to map IP addresses to dns names" );
         Environment.Exit( 0 );
     } //Usage
@@ -159,6 +161,7 @@ class DnsApp
     {
         bool loop = false;
         int loopPasses = -1;
+        bool useLookIP = false;
 
         InitializePrefixEntries();
         const string persistentFilename = "dns_entries.txt";
@@ -259,6 +262,10 @@ class DnsApp
                     ShowCurrentConnections();
                     Environment.Exit( 0 );
                 }
+                else if ( 'X' == c )
+                {
+                    useLookIP = true;
+                }
                 else
                     Usage();
             }
@@ -314,7 +321,7 @@ class DnsApp
                     // Azure domains aren't resolved above; don't flood LookIP with those. Just use the prefix.
 
                     hostName = FindPrefixEntry( ip );
-                    if ( null == hostName )
+                    if ( useLookIP && null == hostName )
                     {
                         try
                         {
