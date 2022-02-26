@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+
+    <!-- Use EXE for command-line and WinExe for GUI. -->
+    <OutputType>Exe</OutputType>
+    <Optimize>true</Optimize>
+    <DebugType>full</DebugType>
+
+    <TargetFramework>net6.0</TargetFramework>
+
+    <!-- These are specified in the dotnet publish batch file
+        <RuntimeIdentifier>win10-x64</RuntimeIdentifier>
+        <PublishSingleFile>true</PublishSingleFile>
+    -->
+
+  </PropertyGroup>
+
+  <!-- This makes build not generate per-locale folders for forms dlls -->
+  <Target Name="RemoveSatelliteAssemblies" AfterTargets="ResolveAssemblyReferences">
+    <ItemGroup>
+        <ReferenceCopyLocalPaths Remove="@(ReferenceSatellitePaths)" />
+    </ItemGroup>
+  </Target>
+
+</Project>
