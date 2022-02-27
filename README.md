@@ -3,6 +3,8 @@
 Windows command-line app that shows network connection information. Useful for seeing what services your PC
 is connecting to. 
 
+Bits and pieces of ping, netstat, and nslookup.
+
     usage: dns [-l] [-i]
     arguments:
         -a         Show active listeners on this machine
