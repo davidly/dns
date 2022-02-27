@@ -5,7 +5,7 @@ is connecting to.
 
 Bits and pieces of ping, netstat, and nslookup.
 
-    usage: dns [-l] [-i]
+    usage: dns [-a] [-i] [-l] [-p] [-s] [-x]
     arguments:
         -a         Show active listeners on this machine
         -i:IPV4    Find a host or company name for the address, e.g. /i:64.74.236.127
