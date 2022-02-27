@@ -367,7 +367,7 @@ class DnsApp
 
         // When looping, short-lived connections will be missed. This app just polls.
 
-        Console.WriteLine( "  PID    State          Local address          Foreign address          Host/Company name                                     Process");
+        Console.WriteLine( "  PID    State          Local address          Foreign address          Host/Company name                                      Process");
         int passes = 0;
 
         do
@@ -430,7 +430,7 @@ class DnsApp
                 bool added = inmemoryEntries.TryAdd( ip, hostName );
 
                 if ( added )
-                    Console.WriteLine( "  {0,-6} {1,-15}{2,-23}{3,-23}  {4,-53} {5}",
+                    Console.WriteLine( "  {0,-6} {1,-15}{2,-23}{3,-23}  {4,-54} {5}",
                                        conn.pid, (TcpState) conn.state, conn.local, endPoint, hostName, Process.GetProcessById( conn.pid ).ProcessName );
 
                 // Don't persist failed reverse dns lookups
@@ -463,16 +463,16 @@ class DnsApp
             }
 
             if ( loop )
-                Thread.Sleep( 500 );
+                Thread.Sleep( 100 );
         } while ( loop );
     } //Main
 
     // Call the DLL directly to get PID information, since .net doesn't provide this
 
     [DllImport( "iphlpapi.dll", SetLastError = true )]
-    public static extern int GetExtendedTcpTable( byte[] pTcpTable, out int dwOutBufLen, bool sort, int ipVersion, int tblClass, int reserved);
+    public static extern int GetExtendedTcpTable( byte[] pTcpTable, out int dwOutBufLen, bool sort, int ipVersion, int tblClass, int reserved );
 
-    public static IPEndPoint BufferToIPEndPoint( byte[] buffer, ref int offset, bool isRemote )
+    public static IPEndPoint BufferToIPEndPoint( byte[] buffer, ref int offset )
     {
         UInt32 address= BitConverter.ToUInt32( buffer, offset );
         offset += 4;
@@ -487,19 +487,22 @@ class DnsApp
     {
         int AF_INET = 2; // IP_v4
         int TCP_TABLE_OWNER_PID_CONNECTIONS = 4;  // don't enumerate listeners
-        int buffSize = 32 * 1024;
-        byte [] buffer = new byte[ buffSize ];
-        int res = GetExtendedTcpTable( buffer, out buffSize, true, AF_INET, TCP_TABLE_OWNER_PID_CONNECTIONS, 0 );
-        if ( 0 != res )
+        int buffSize = 32 * 1024; // tested with 0
+        byte [] buffer;
+
+        do
         {
             buffer = new byte[ buffSize ];
-            res = GetExtendedTcpTable( buffer, out buffSize, true, AF_INET, TCP_TABLE_OWNER_PID_CONNECTIONS, 0 );
-            if ( 0 != res )
-            {
-                Console.WriteLine( "failed to read tcp entries, error {0}", res );
-                return null;
-            }
-        }
+            int res = GetExtendedTcpTable( buffer, out buffSize, false, AF_INET, TCP_TABLE_OWNER_PID_CONNECTIONS, 0 );
+            if ( 0 == res )
+                break;
+
+            if ( 122 == res ) // ERROR_INSUFFICIENT_BUFFER
+                continue;
+
+            Console.WriteLine( "failed to read tcp entries, error {0}", res );
+            return null;
+        } while ( true );
   
         int offset = 0;
         int numEntries = BitConverter.ToInt32( buffer, offset );
@@ -510,11 +513,13 @@ class DnsApp
         for ( int i = 0; i < numEntries; i++ )
         {
             cons[ i ] = new TCPConnection();
+
             cons[ i ].state = BitConverter.ToInt32( buffer, offset );
             offset += 4;
           
-            cons[ i ].local = BufferToIPEndPoint( buffer, ref offset, false );
-            cons[ i ].remote = BufferToIPEndPoint( buffer, ref offset, true );
+            cons[ i ].local = BufferToIPEndPoint( buffer, ref offset );
+            cons[ i ].remote = BufferToIPEndPoint( buffer, ref offset );
+
             cons[ i ].pid = BitConverter.ToInt32( buffer, offset );
             offset += 4;
         }
