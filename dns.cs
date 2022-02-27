@@ -2,7 +2,7 @@
 // Shows network connection information
 // For the reverse DNS resolutions that .net 6 didn't find, I used (with example IPs):
 //    manual:                 https://otx.alienvault.com/indicator/ip/40.114.105.100
-//    automatical (use /x):   https://www.lookip.net/ip/38.133.127.31
+//    automatic (use /x):     https://www.lookip.net/ip/38.133.127.31
 //
 
 using System;
@@ -73,11 +73,10 @@ class DnsApp
 
     static void PingServer( string remoteServer )
     {
-        string server = null;
-        IPAddress serverip = null;
-
         try
         {
+            string server = null;
+            IPAddress serverip = null;
             bool parseOK = IPAddress.TryParse( remoteServer, out serverip );
             if ( parseOK )
             {
@@ -225,7 +224,7 @@ class DnsApp
 
     static void Usage()
     {
-        Console.WriteLine( "usage: dns [-a] [-i] [-l] [-s] [-x]" );
+        Console.WriteLine( "usage: dns [-a] [-i] [-l] [-p] [-s] [-x]" );
         Console.WriteLine( "enumerates currently open tcp connections" );
         Console.WriteLine( "arguments:" );
         Console.WriteLine( "    -a         Show active listeners on this machine" );
