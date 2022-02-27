@@ -17,12 +17,21 @@ using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Net.Http;
+using System.Runtime.InteropServices;
 
 class DnsApp
 {
     static ConcurrentDictionary<string,string> inmemoryEntries = new ConcurrentDictionary<string,string>();
     static ConcurrentDictionary<string,string> persistentEntries = new ConcurrentDictionary<string,string>();
     static ConcurrentDictionary<string,string> prefixEntries = new ConcurrentDictionary<string,string>();
+
+    public struct TCPConnection
+    {
+        public int state;
+        public int pid;
+        public IPEndPoint local;
+        public IPEndPoint remote;
+    }
 
     static string likelyOwnerFromLookIP( string ip )
     {
@@ -358,14 +367,14 @@ class DnsApp
 
         // When looping, short-lived connections will be missed. This app just polls.
 
-        Console.WriteLine( "  Proto  State          Local address          Foreign address          Host/Company name");
+        Console.WriteLine( "  PID    State          Local address          Foreign address          Host/Company name                                     Process");
         int passes = 0;
 
         do
         {
-            Parallel.ForEach( props.GetActiveTcpConnections(), conn =>
+            Parallel.ForEach( GetTcpConnections(), conn =>
             {
-                IPEndPoint endPoint = conn.RemoteEndPoint;
+                IPEndPoint endPoint = conn.remote;
                 string hostName = null;
 
                 // strip off the ":port"
@@ -421,7 +430,8 @@ class DnsApp
                 bool added = inmemoryEntries.TryAdd( ip, hostName );
 
                 if ( added )
-                    Console.WriteLine( "  TCP    {0,-15}{1,-23}{2,-23}  {3}", conn.State, conn.LocalEndPoint, endPoint, hostName );
+                    Console.WriteLine( "  {0,-6} {1,-15}{2,-23}{3,-23}  {4,-53} {5}",
+                                       conn.pid, (TcpState) conn.state, conn.local, endPoint, hostName, Process.GetProcessById( conn.pid ).ProcessName );
 
                 // Don't persist failed reverse dns lookups
 
@@ -456,4 +466,60 @@ class DnsApp
                 Thread.Sleep( 500 );
         } while ( loop );
     } //Main
+
+    // Call the DLL directly to get PID information, since .net doesn't provide this
+
+    [DllImport( "iphlpapi.dll", SetLastError = true )]
+    public static extern int GetExtendedTcpTable( byte[] pTcpTable, out int dwOutBufLen, bool sort, int ipVersion, int tblClass, int reserved);
+
+    public static IPEndPoint BufferToIPEndPoint( byte[] buffer, ref int offset, bool isRemote )
+    {
+        UInt32 address= BitConverter.ToUInt32( buffer, offset );
+        offset += 4;
+
+        ushort port = (ushort) IPAddress.NetworkToHostOrder( BitConverter.ToInt16( buffer, offset ) );
+        offset += 4;
+
+        return new IPEndPoint( address, port );
+    } //BufferToIPEndPoint
+
+    public static TCPConnection[] GetTcpConnections()
+    {
+        int AF_INET = 2; // IP_v4
+        int TCP_TABLE_OWNER_PID_CONNECTIONS = 4;  // don't enumerate listeners
+        int buffSize = 32 * 1024;
+        byte [] buffer = new byte[ buffSize ];
+        int res = GetExtendedTcpTable( buffer, out buffSize, true, AF_INET, TCP_TABLE_OWNER_PID_CONNECTIONS, 0 );
+        if ( 0 != res )
+        {
+            buffer = new byte[ buffSize ];
+            res = GetExtendedTcpTable( buffer, out buffSize, true, AF_INET, TCP_TABLE_OWNER_PID_CONNECTIONS, 0 );
+            if ( 0 != res )
+            {
+                Console.WriteLine( "failed to read tcp entries, error {0}", res );
+                return null;
+            }
+        }
+  
+        int offset = 0;
+        int numEntries = BitConverter.ToInt32( buffer, offset );
+        offset += 4;
+
+        TCPConnection[] cons = new TCPConnection[ numEntries ];
+
+        for ( int i = 0; i < numEntries; i++ )
+        {
+            cons[ i ] = new TCPConnection();
+            cons[ i ].state = BitConverter.ToInt32( buffer, offset );
+            offset += 4;
+          
+            cons[ i ].local = BufferToIPEndPoint( buffer, ref offset, false );
+            cons[ i ].remote = BufferToIPEndPoint( buffer, ref offset, true );
+            cons[ i ].pid = BitConverter.ToInt32( buffer, offset );
+            offset += 4;
+        }
+
+        return cons;
+    } //GetTcpConnections
 } //DnsApp
+
