@@ -222,6 +222,20 @@ class DnsApp
         return null;
     } //FindPrefixEntry
 
+    static string GetProcessName( int pid )
+    {
+        string name = "n/a";
+
+        try
+        {
+            Process proc = Process.GetProcessById( pid );
+            name = proc.ProcessName;
+        }
+        catch( Exception ) {} // The process may have ended, resulting in ArgumentException
+
+        return name;
+    } //GetProcessName
+
     static void Usage()
     {
         Console.WriteLine( "usage: dns [-a] [-i] [-l] [-p] [-s] [-x]" );
@@ -274,8 +288,11 @@ class DnsApp
         {
             if ( '-' == args[i][0] || '/' == args[i][0] )
             {
-                string argUpper = args[i].ToUpper();
                 string arg = args[i];
+                if ( arg.Length < 2 )
+                    Usage();
+
+                string argUpper = arg.ToUpper();
                 char c = argUpper[1];
 
                 if ( 'A' == c )
@@ -423,34 +440,36 @@ class DnsApp
                     }
                 }
 
-                if ( null == hostName || 0 == hostName.Length )
-                    hostName = "(unknown)";
-
-                bool added = inmemoryEntries.TryAdd( ip, hostName );
-
-                if ( added )
-                    Console.WriteLine( "  {0,-6} {1,-15}{2,-23}{3,-23}  {4,-54} {5}",
-                                       conn.pid, (TcpState) conn.state, conn.local, endPoint, hostName, Process.GetProcessById( conn.pid ).ProcessName );
-
-                // Don't persist failed reverse dns lookups
-
-                if ( 0 != String.Compare( hostName, "(unknown)" ) )
+                try
                 {
-                    added = persistentEntries.TryAdd( ip, hostName );
-                    if ( added )
-                    {
-                        lock( args )
-                        {
-                            //Console.WriteLine( "new persistent entry {0} {1}", ip, hostName );
+                    if ( null == hostName || 0 == hostName.Length )
+                        hostName = "(unknown)";
     
-                            if ( !File.Exists( persistentFilename ) )
-                                using ( StreamWriter sw = File.CreateText( persistentFilename ) )
-                                    sw.WriteLine( "{0} {1}", ip, hostName );
-                            else
-                                using ( StreamWriter sw = File.AppendText( persistentFilename ) )
-                                    sw.WriteLine( "{0} {1}", ip, hostName );
+                    if ( inmemoryEntries.TryAdd( ip, hostName ) )
+                        Console.WriteLine( "  {0,-6} {1,-15}{2,-23}{3,-23}  {4,-54} {5}",
+                                           conn.pid, (TcpState) conn.state, conn.local, endPoint, hostName, GetProcessName( conn.pid ) );
+    
+                    // Don't persist failed reverse dns lookups
+    
+                    if ( 0 != String.Compare( hostName, "(unknown)" ) )
+                    {
+                        if ( persistentEntries.TryAdd( ip, hostName ) )
+                        {
+                            lock( args )
+                            {
+                                if ( !File.Exists( persistentFilename ) )
+                                    using ( StreamWriter sw = File.CreateText( persistentFilename ) )
+                                        sw.WriteLine( "{0} {1}", ip, hostName );
+                                else
+                                    using ( StreamWriter sw = File.AppendText( persistentFilename ) )
+                                        sw.WriteLine( "{0} {1}", ip, hostName );
+                            }
                         }
                     }
+                }
+                catch ( Exception e )
+                {
+                    Console.WriteLine( "caught exception writing/saving host name: {0}", e.ToString() );
                 }
             } );
 
@@ -484,46 +503,55 @@ class DnsApp
 
     public static TCPConnection[] GetTcpConnections()
     {
-        int AF_INET = 2; // IP_v4
-        int TCP_TABLE_OWNER_PID_CONNECTIONS = 4;  // don't enumerate listeners
-        int buffSize = 32 * 1024; // tested with 0
-        byte [] buffer;
-
-        do
+        try
         {
-            buffer = new byte[ buffSize ];
-            int res = GetExtendedTcpTable( buffer, out buffSize, false, AF_INET, TCP_TABLE_OWNER_PID_CONNECTIONS, 0 );
-            if ( 0 == res )
-                break;
+            int AF_INET = 2; // IP_v4
+            int TCP_TABLE_OWNER_PID_CONNECTIONS = 4;  // don't enumerate listeners
+            int buffSize = 32 * 1024; // tested with 0
+            byte [] buffer;
+    
+            do
+            {
+                buffer = new byte[ buffSize ];
+                int res = GetExtendedTcpTable( buffer, out buffSize, false, AF_INET, TCP_TABLE_OWNER_PID_CONNECTIONS, 0 );
+                if ( 0 == res )
+                    break;
+    
+                if ( 122 == res ) // ERROR_INSUFFICIENT_BUFFER
+                    continue;
+    
+                Console.WriteLine( "failed to read tcp entries, error {0}", res );
+                return null;
+            } while ( true );
+      
+            int offset = 0;
+            int numEntries = BitConverter.ToInt32( buffer, offset );
+            offset += 4;
+    
+            TCPConnection[] cons = new TCPConnection[ numEntries ];
+    
+            for ( int i = 0; i < numEntries; i++ )
+            {
+                cons[ i ] = new TCPConnection();
+    
+                cons[ i ].state = BitConverter.ToInt32( buffer, offset );
+                offset += 4;
+              
+                cons[ i ].local = BufferToIPEndPoint( buffer, ref offset );
+                cons[ i ].remote = BufferToIPEndPoint( buffer, ref offset );
+    
+                cons[ i ].pid = BitConverter.ToInt32( buffer, offset );
+                offset += 4;
+            }
 
-            if ( 122 == res ) // ERROR_INSUFFICIENT_BUFFER
-                continue;
-
-            Console.WriteLine( "failed to read tcp entries, error {0}", res );
-            return null;
-        } while ( true );
-  
-        int offset = 0;
-        int numEntries = BitConverter.ToInt32( buffer, offset );
-        offset += 4;
-
-        TCPConnection[] cons = new TCPConnection[ numEntries ];
-
-        for ( int i = 0; i < numEntries; i++ )
+            return cons;
+        }
+        catch( Exception e )
         {
-            cons[ i ] = new TCPConnection();
-
-            cons[ i ].state = BitConverter.ToInt32( buffer, offset );
-            offset += 4;
-          
-            cons[ i ].local = BufferToIPEndPoint( buffer, ref offset );
-            cons[ i ].remote = BufferToIPEndPoint( buffer, ref offset );
-
-            cons[ i ].pid = BitConverter.ToInt32( buffer, offset );
-            offset += 4;
+            Console.WriteLine( "caught exception getting tcp connections {0}", e.ToString() );
         }
 
-        return cons;
+        return new TCPConnection[ 0 ];
     } //GetTcpConnections
 } //DnsApp
 
