@@ -21,16 +21,32 @@ using System.Runtime.InteropServices;
 
 class DnsApp
 {
-    static ConcurrentDictionary<string,string> inmemoryEntries = new ConcurrentDictionary<string,string>();
-    static ConcurrentDictionary<string,string> persistentEntries = new ConcurrentDictionary<string,string>();
-    static ConcurrentDictionary<string,string> prefixEntries = new ConcurrentDictionary<string,string>();
+    static SortedSet<string> unknownEntries = new SortedSet<string>();
+    static Dictionary<string,string> persistentEntries = new Dictionary<string,string>();
+    static Dictionary<string,string> prefixEntries = new Dictionary<string,string>();
 
-    public struct TCPConnection
+    public enum ConName : byte { unresolvedCN = 0, persistentCN, unknownCN, revipCN, lookipCN, prefixCN }
+
+    public class TCPConnection
     {
+        public TCPConnection()
+        {
+            state = 0;
+            pid = 0;
+            local = null;
+            remote = null;
+            newConnection = false;
+            conName = ConName.unresolvedCN;
+            remoteName = null;
+        }
+
         public int state;
         public int pid;
         public IPEndPoint local;
         public IPEndPoint remote;
+        public bool newConnection;
+        public ConName conName;
+        public string remoteName;
     }
 
     static string likelyOwnerFromLookIP( string ip )
@@ -255,6 +271,22 @@ class DnsApp
         Environment.Exit( 0 );
     } //Usage
 
+    static string IPWithoutPort( IPEndPoint endPoint )
+    {
+        string ip = endPoint.ToString();
+        int colon = ip.IndexOf( ':' );
+        if ( -1 != colon )
+            ip = ip.Substring( 0, colon );
+
+        return ip;
+    } //IPWithoutPort
+
+    static void PrintConnection( TCPConnection conn )
+    {
+        Console.WriteLine( "  {0,-13}{1,-22}{2,-22}{3,-55} {4,-6} {5}",
+                           (TcpState) conn.state, conn.local, conn.remote, conn.remoteName, conn.pid, GetProcessName( conn.pid ) );
+    } //PrintConnection
+
     static void Main( string[] args )
     {
         bool loop = false;
@@ -383,95 +415,150 @@ class DnsApp
 
         // When looping, short-lived connections will be missed. This app just polls.
 
-        Console.WriteLine( "  PID    State          Local address          Foreign address          Host/Company name                                      Process");
+        Console.WriteLine( "  State        Local address         Foreign address       Host/Company name                                       PID    Process");
         int passes = 0;
+        TCPConnection [] prev = new TCPConnection[ 0 ];
 
         do
         {
-            Parallel.ForEach( GetTcpConnections(), conn =>
+            TCPConnection [] conns = GetTcpConnections();
+            List<int> unresolvedIndexes = new List<int>();
+
+            for ( int i = 0; i < conns.Length; i++ )
             {
-                IPEndPoint endPoint = conn.remote;
-                string hostName = null;
+                TCPConnection conn = conns[ i ];
 
-                // strip off the ":port"
+                // see if it's in the previous snapshot. If so, ignore it
 
-                string ip = endPoint.ToString();
-                int colon = ip.IndexOf( ':' );
-                if ( -1 != colon )
-                    ip = ip.Substring( 0, colon );
+                bool duplicate = false;
+                for ( int p = 0; p < prev.Length; p++ )
+                {
+                    if ( conn.remote.Address.Equals( prev[ p ].remote.Address )  &&
+                         conn.remote.Port == prev[ p ].remote.Port &&
+                         conn.local.Address.Equals( prev[ p ].local.Address ) &&
+                         conn.local.Port == prev[ p ].local.Port &&
+                         conn.pid  == prev[ p ].pid &&
+                         conn.state  == prev[ p ].state )
+                    {
+                        duplicate = true;
+                        break;
+                    }
+                }
+
+                if ( duplicate )
+                    continue;
+
+                conn.newConnection = true;
+
+                // resolve the remote name in the persistent cache or unknown list
+
+                string ip = IPWithoutPort( conn.remote );
+                if ( persistentEntries.TryGetValue( ip, out conn.remoteName ) )
+                {
+                    conn.conName = ConName.persistentCN;
+                    PrintConnection( conn );
+                }
+                else if ( unknownEntries.Contains( ip ) )
+                {
+                    conn.remoteName = "(unknown)";
+                    conn.conName = ConName.unknownCN;
+                }
+
+                if ( ConName.unresolvedCN == conn.conName )
+                    unresolvedIndexes.Add( i );
+            }
+
+            // Perform a reverse DNS lookup for unresolved entries
+
+            //for ( int u = 0; u < unresolvedIndexes.Count; u++ )
+            Parallel.For( 0, unresolvedIndexes.Count, u =>
+            {
+                TCPConnection conn = conns[ unresolvedIndexes[ u ] ];
+
+                string ip = IPWithoutPort( conn.remote );
     
                 try
                 {
-                    IPAddress a = endPoint.Address;
+                    IPAddress a = conn.remote.Address;
                     string address = a.ToString();
 
                     if ( address.Length >= 7 && '[' != address[ 0 ] ) // IPV4 only
                     {
-                        string newValue = null;
+                        // This call will raise an exception if the host name can't be determined
 
-                        // look at both caches since many domains will be persistent and (unknown) entries will be in inmemory
-    
-                        if ( persistentEntries.TryGetValue( ip, out newValue ) )
-                            hostName = newValue;
-                        else if ( inmemoryEntries.TryGetValue( ip, out newValue ) )
-                            hostName = newValue;
-                        else
-                        {
-                            // This call will raise an exception if the host name can't be determined
-
-                            System.Net.IPHostEntry hostEntry = System.Net.Dns.GetHostEntry( a );
-                            hostName = hostEntry.HostName;
-                        }
+                        System.Net.IPHostEntry hostEntry = System.Net.Dns.GetHostEntry( a );
+                        conn.remoteName = hostEntry.HostName;
+                        conn.conName = ConName.revipCN;
                     }
                 }
                 catch ( Exception )
                 {
                     // Azure domains aren't resolved above; don't flood LookIP with those. Just use the prefix.
 
-                    hostName = FindPrefixEntry( ip );
-                    if ( useLookIP && null == hostName )
+                    conn.remoteName = FindPrefixEntry( ip );
+                    if ( null != conn.remoteName )
+                    {
+                        conn.conName = ConName.prefixCN;
+                    }
+                    else if ( useLookIP )
                     {
                         try
                         {
                             // This may return either a domain or a company name
-                            hostName = likelyOwnerFromLookIP( ip );
+
+                            conn.remoteName = likelyOwnerFromLookIP( ip );
+                            if ( null != conn.remoteName )
+                                conn.conName = ConName.lookipCN;
                         }
                         catch ( Exception ) { }
                     }
                 }
 
-                try
+                if ( null == conn.remoteName || 0 == conn.remoteName.Length )
                 {
-                    if ( null == hostName || 0 == hostName.Length )
-                        hostName = "(unknown)";
-    
-                    if ( inmemoryEntries.TryAdd( ip, hostName ) )
-                        Console.WriteLine( "  {0,-6} {1,-15}{2,-23}{3,-23}  {4,-54} {5}",
-                                           conn.pid, (TcpState) conn.state, conn.local, endPoint, hostName, GetProcessName( conn.pid ) );
-    
-                    // Don't persist failed reverse dns lookups
-    
-                    if ( 0 != String.Compare( hostName, "(unknown)" ) )
+                    conn.remoteName = "(unknown)";
+                    conn.conName = ConName.unknownCN;
+                }
+            } );
+
+            // Update caches and print out any new entries not found in the persistent cache and already printed above 
+
+            for ( int i = 0; i < conns.Length; i++ )
+            {
+                TCPConnection conn = conns[ i ];
+
+                if ( conn.newConnection )
+                {
+                    string ip = IPWithoutPort( conn.remote );
+                    Debug.Assert( ConName.unresolvedCN != conn.conName );
+
+                    if ( conn.conName == ConName.lookipCN ||
+                         conn.conName == ConName.prefixCN ||
+                         conn.conName == ConName.revipCN )
                     {
-                        if ( persistentEntries.TryAdd( ip, hostName ) )
+                        if ( persistentEntries.TryAdd( ip, conn.remoteName ) )
                         {
-                            lock( args )
+                            try
                             {
                                 if ( !File.Exists( persistentFilename ) )
                                     using ( StreamWriter sw = File.CreateText( persistentFilename ) )
-                                        sw.WriteLine( "{0} {1}", ip, hostName );
+                                        sw.WriteLine( "{0} {1}", ip, conn.remoteName );
                                 else
                                     using ( StreamWriter sw = File.AppendText( persistentFilename ) )
-                                        sw.WriteLine( "{0} {1}", ip, hostName );
+                                        sw.WriteLine( "{0} {1}", ip, conn.remoteName );
                             }
+                            catch( Exception ) {}
                         }
                     }
+                    else if ( ConName.unknownCN == conn.conName )
+                         unknownEntries.Add( ip );
+
+                    if ( ConName.persistentCN != conn.conName )
+                        PrintConnection( conn );
                 }
-                catch ( Exception e )
-                {
-                    Console.WriteLine( "caught exception writing/saving host name: {0}", e.ToString() );
-                }
-            } );
+            }
+
+            prev = conns;
 
             if ( -1 != loopPasses )
             {
@@ -507,7 +594,7 @@ class DnsApp
         {
             int AF_INET = 2; // IP_v4
             int TCP_TABLE_OWNER_PID_CONNECTIONS = 4;  // don't enumerate listeners
-            int buffSize = 32 * 1024; // tested with 0
+            int buffSize = 32 * 1024; // tested with 0, but non-0 to avoid a loop
             byte [] buffer;
     
             do
