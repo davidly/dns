@@ -26,34 +26,63 @@ C:\Users\david\OneDrive\dns>dns -i:104.98.114.24
     
 C:\Users\david\OneDrive\dns>dns
 
-    PID    State          Local address          Foreign address          Host/Company name                                     Process
-    5400   Established    192.168.0.105:55571    23.215.176.115:80        a23-215-176-115.deploy.static.akamaitechnologies.com  svchost
-    16388  Established    192.168.0.105:55538    140.82.112.25:443        lb-140-82-112-25-iad.github.com                       msedge
-    5400   Established    192.168.0.105:55623    13.107.4.50:80           Microsoft Azure                                       svchost
-    16388  Established    192.168.0.105:51366    151.101.130.166:443      Fastly                                                msedge
-    15632  Established    192.168.0.105:51478    44.194.17.145:443        ec2-44-194-17-145.compute-1.amazonaws.com             CoreSync
-    16388  Established    192.168.0.105:53225    104.244.42.66:443        Twitter                                               msedge
-    16388  Established    192.168.0.105:61594    104.244.42.193:443       Twitter                                               msedge
-    5148   Established    192.168.0.105:56850    52.96.166.50:443         Microsoft                                             SearchHost
-    16388  Established    192.168.0.105:51240    151.101.22.114:443       Fastly                                                msedge
-    16388  Established    192.168.0.105:61515    185.184.8.65:443         ip-185-184-8-65.rtbhouse.net                          msedge
-    5488   Established    192.168.0.105:56814    13.64.180.106:443        wns.windows.com                                       svchost
-    16388  Established    192.168.0.105:61479    151.101.22.49:443        Fastly                                                msedge
-    16388  Established    192.168.0.105:51492    192.229.173.16:443       Verizon Business                                      msedge
-    5400   Established    192.168.0.105:55572    23.195.235.45:80         a23-195-235-45.deploy.static.akamaitechnologies.com   svchost
-    3384   CloseWait      192.168.0.105:62039    23.216.80.9:443          a23-216-80-9.deploy.static.akamaitechnologies.com     Video.UI
-    16388  Established    192.168.0.105:55537    185.199.110.133:443      cdn-185-199-110-133.github.com                        msedge
-    16388  Established    192.168.0.105:51464    65.8.164.100:443         server-65-8-164-100.sfo53.r.cloudfront.net            msedge
-    33448  Established    192.168.0.105:55624    51.104.15.253:443        events.data.microsoft.com                             OneDrive
-    16388  Established    192.168.0.105:53367    104.244.43.131:443       Fastly                                                msedge
-    16388  Established    192.168.0.105:55565    192.168.0.174:2869       Xbox-SystemOS.local                                   msedge
-    16388  Established    192.168.0.105:51218    151.101.21.164:443       Fastly                                                msedge
-    16388  Established    192.168.0.105:61636    152.195.54.7:443         Verizon Internet Services                             msedge
-    16388  Established    192.168.0.105:51344    151.101.21.44:443        Fastly                                                msedge
-    16388  Established    192.168.0.105:51350    152.195.55.192:443       Verizon Business                                      msedge
-    15632  Established    192.168.0.105:62031    54.160.197.138:443       ec2-54-160-197-138.compute-1.amazonaws.com            CoreSync
-    16388  Established    192.168.0.105:51198    151.101.22.217:443       Fastly                                                msedge
-    5480   Established    127.0.0.1:50322        127.0.0.1:65001          david-pc                                              nvcontainer
+    State        Local address         Foreign address       Host/Company name                                       PID    Process
+    Established  192.168.0.105:49224   72.21.81.200:443      Verizon Business                                        3724   Code
+    Established  192.168.0.105:49228   20.189.173.5:443      Microsoft Azure                                         17764  OneDrive
+    TimeWait     192.168.0.105:49238   140.82.113.4:443      lb-140-82-113-4-iad.github.com                          0      Idle
+    TimeWait     192.168.0.105:49241   140.82.113.4:443      lb-140-82-113-4-iad.github.com                          0      Idle
+    TimeWait     192.168.0.105:49242   20.42.65.90:443       Microsoft Azure                                         0      Idle
+    Established  192.168.0.105:49246   54.80.149.42:443      ec2-54-80-149-42.compute-1.amazonaws.com                18328  msedge
+    Established  192.168.0.105:49249   140.82.112.25:443     lb-140-82-112-25-iad.github.com                         18328  msedge
+    Established  192.168.0.105:49540   54.161.91.12:443      ec2-54-161-91-12.compute-1.amazonaws.com                23008  CoreSync
+    Established  192.168.0.105:49698   40.83.240.146:443     Microsoft Azure                                         5588   svchost
+    TimeWait     192.168.0.105:50260   13.107.5.93:443       Microsoft Azure                                         0      Idle
+    Established  127.0.0.1:50275       127.0.0.1:65001       david-pc                                                5608   nvcontainer
+    Established  127.0.0.1:50286       127.0.0.1:50309       david-pc                                                14844  NVIDIA Web Helper
+    Established  127.0.0.1:50309       127.0.0.1:50286       david-pc                                                16956  NVIDIA Share
+    Established  192.168.0.105:50344   13.64.180.106:443     wns.windows.com                                         17764  OneDrive
+    Established  192.168.0.105:50356   40.64.128.224:443     Microsoft Azure                                         3724   Code
+    Established  127.0.0.1:50424       127.0.0.1:50559       david-pc                                                23084  node
+    Established  127.0.0.1:50559       127.0.0.1:50424       david-pc                                                21748  Adobe CEF Helper
+    CloseWait    192.168.0.105:50818   72.21.91.29:80        Edgecast/Verizon/Yahoo                                  25364  GameBar
+    CloseWait    192.168.0.105:50820   23.45.228.133:443     a23-45-228-133.deploy.static.akamaitechnologies.com     25364  GameBar
+    TimeWait     192.168.0.105:50824   152.199.4.33:443      Edgecast vo.msecnd.net azureedge.net                    0      Idle
+    TimeWait     192.168.0.105:50825   20.189.173.5:443      Microsoft Azure                                         0      Idle
+    Established  192.168.0.105:51279   104.244.42.1:443      Twitter                                                 18328  msedge
+    Established  192.168.0.105:51876   13.107.5.93:443       Microsoft Azure                                         3724   Code
+    TimeWait     192.168.0.105:51887   140.82.112.3:443      lb-140-82-112-3-iad.github.com                          0      Idle
+    TimeWait     192.168.0.105:53074   40.64.128.224:443     Microsoft Azure                                         0      Idle
+    TimeWait     192.168.0.105:53710   72.21.81.200:443      Verizon Business                                        0      Idle
+    Established  192.168.0.105:53737   20.189.173.4:443      Microsoft Azure                                         18328  msedge
+    TimeWait     192.168.0.105:53738   52.96.119.98:443      Microsoft Azure                                         0      Idle
+    Established  192.168.0.105:53739   140.82.113.4:443      lb-140-82-113-4-iad.github.com                          18328  msedge
+    Established  192.168.0.105:53744   185.199.108.133:443   cdn-185-199-108-133.github.com                          18328  msedge
+    Established  192.168.0.105:53746   140.82.113.22:443     lb-140-82-113-22-iad.github.com                         18328  msedge
+    Established  192.168.0.105:53747   192.30.255.116:443    lb-192-30-255-116-sea.github.com                        18328  msedge
+    TimeWait     192.168.0.105:53755   23.32.46.59:80        a23-32-46-59.deploy.static.akamaitechnologies.com       0      Idle
+    TimeWait     192.168.0.105:53756   23.215.176.146:80     a23-215-176-146.deploy.static.akamaitechnologies.com    0      Idle
+    TimeWait     192.168.0.105:53757   104.99.72.226:80      a104-99-72-226.deploy.static.akamaitechnologies.com     0      Idle
+    Established  192.168.0.105:55583   104.244.42.66:443     api.twitter.com                                         18328  msedge
+    Established  192.168.0.105:55619   52.96.119.98:443      Microsoft Azure                                         28792  OUTLOOK
+    Established  192.168.0.105:55655   40.97.142.18:443      Microsoft Azure                                         28792  OUTLOOK
+    CloseWait    192.168.0.105:55685   23.45.228.133:443     a23-45-228-133.deploy.static.akamaitechnologies.com     16992  Video.UI
+    CloseWait    192.168.0.105:55686   72.21.91.29:80        Edgecast/Verizon/Yahoo                                  16992  Video.UI
+    Established  192.168.0.105:55716   40.97.132.18:443      Microsoft Azure                                         28792  OUTLOOK
+    Established  192.168.0.105:55723   40.97.132.18:443      Microsoft Azure                                         28792  OUTLOOK
+    Established  192.168.0.105:55728   44.194.17.145:443     ec2-44-194-17-145.compute-1.amazonaws.com               23008  CoreSync
+    Established  192.168.0.105:55729   72.21.91.70:443       Edgecast/Verizon/Yahoo                                  18328  msedge
+    Established  192.168.0.105:55732   52.84.159.6:443       server-52-84-159-6.sea19.r.cloudfront.net               18328  msedge
+    Established  192.168.0.105:55733   99.86.38.61:443       server-99-86-38-61.sea19.r.cloudfront.net               18328  msedge
+    TimeWait     192.168.0.105:57580   13.66.138.105:443     azurewebsites.com                                       0      Idle
+    TimeWait     192.168.0.105:57731   93.184.215.201:443    Verizon Business                                        0      Idle
+    TimeWait     192.168.0.105:59012   13.107.42.18:443      Microsoft Azure                                         0      Idle
+    Established  192.168.0.105:60263   13.66.138.105:443     azurewebsites.com                                       3724   Code
+    Established  192.168.0.105:60266   185.199.111.154:443   cdn-185-199-111-154.github.com                          18328  msedge
+    TimeWait     192.168.0.105:61382   93.184.215.201:443    Verizon Business                                        0      Idle
+    Established  192.168.0.105:61867   40.87.19.190:443      Microsoft Azure                                         23616  msteams
+    Established  192.168.0.105:63981   13.107.42.18:443      Microsoft Azure                                         3724   Code
+    Established  192.168.0.105:63983   185.199.111.154:443   cdn-185-199-111-154.github.com                          18328  msedge
+    Established  127.0.0.1:65001       127.0.0.1:50275       david-pc                                                5608   nvcontainer
 
 C:\Users\david\OneDrive\dns>dns -s
 
