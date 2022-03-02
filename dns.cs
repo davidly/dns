@@ -475,8 +475,6 @@ class DnsApp
             {
                 TCPConnection conn = conns[ unresolvedIndexes[ u ] ];
 
-                string ip = IPWithoutPort( conn.remote );
-    
                 try
                 {
                     IPAddress a = conn.remote.Address;
@@ -495,6 +493,7 @@ class DnsApp
                 {
                     // Azure domains aren't resolved above; don't flood LookIP with those. Just use the prefix.
 
+                    string ip = IPWithoutPort( conn.remote );
                     conn.remoteName = FindPrefixEntry( ip );
                     if ( null != conn.remoteName )
                     {
@@ -551,7 +550,7 @@ class DnsApp
                         }
                     }
                     else if ( ConName.unknownCN == conn.conName )
-                         unknownEntries.Add( ip );
+                         unknownEntries.Add( ip );    // may already exist, and that's OK
 
                     if ( ConName.persistentCN != conn.conName )
                         PrintConnection( conn );
@@ -568,7 +567,7 @@ class DnsApp
             }
 
             if ( loop )
-                Thread.Sleep( 100 );
+                Thread.Sleep( 50 );
         } while ( loop );
     } //Main
 
